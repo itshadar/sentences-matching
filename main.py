@@ -10,9 +10,7 @@ Sentence = list[Word]
 
 
 def parse_args() -> argparse.Namespace:
-    """
-    :return: args: arguments for the program
-    """
+    """Return arguments for the program. """
     parser = argparse.ArgumentParser(description='match pattern to sentences.')
     parser.add_argument('-f', '--file', required=True, help='The file path for sentences file.')
     args = parser.parse_args()
@@ -40,7 +38,6 @@ def parse_sentences(content: list[str]) -> list[Sentence]:
 
 def read_file(fp: str) -> list[str]:
     """ Read file. Return lines of file's content. """
-
     try:
         with open(fp, 'r') as file:
             return file.readlines()
@@ -52,7 +49,6 @@ def read_file(fp: str) -> list[str]:
 
 def write_file(fp: str, content: list[str]) -> None:
     """Write to output file."""
-
     with open(fp, "w") as output_file:
         output_file.writelines(content)
 
@@ -75,7 +71,6 @@ def sentences_grouping(sentences: list[Sentence]) -> list[str]:
     :param sentences: list of sentences to search for common pattern.
     :return: list of patterns and the sentences matching it that were found.
     """
-
     sentences_patterns = []
 
     for index, sentence in enumerate(sentences):
