@@ -38,6 +38,18 @@ class Pattern:
     def __hash__(self):
         return hash((self.pattern_string, self.pattern_index))
 
+    @classmethod
+    def create(cls, sentence: Sentence, pattern_index: int) -> 'Pattern':
+        """return pattern instance by specified pattern index within the given sentence."""
+        pattern_string = Pattern.extract_pattern_string(sentence, pattern_index)
+        self = cls(pattern_string, pattern_index)
+        return self
+
+    @staticmethod
+    def extract_pattern_string(sentence: Sentence, pattern_index: int) -> str:
+        """Extracts the pattern string by removing the word at the specified pattern index within the given sentence."""
+        return convert_to_string(sentence[Pattern.START_INDEX:pattern_index]+sentence[pattern_index+1:])
+
 
 class PatternCollection:
 
@@ -65,6 +77,51 @@ class PatternCollection:
     def get_patterns_groups(self) -> Iterator[tuple[Pattern, list[Sentence]]]:
         """Get an iterator over the pattern groups, yielding each pattern and its associated sentences."""
         return ((pattern, self._data[pattern]) for pattern in self._pattern_groups)
+
+    def extract_pattern_groups_output(self) -> Iterator[str]:
+        """Extract from the pattern collection only the patterns that have a group of sentences."""
+        for pattern, sentences in self.get_patterns_groups():
+            yield PatternCollection.get_pattern_collection_paragraph(sentences, pattern.pattern_index)
+
+    @staticmethod
+    def get_pattern_collection_paragraph(sentences: list[Sentence], pattern_index: int) -> str:
+        """
+        Creates and returns a paragraph containing the pattern string details.
+
+        :param sentences: A list of sentences that share the same pattern.
+        :param pattern_index: The index of the differing word in the pattern.
+        :return: A paragraph containing the detailed pattern string.
+        """
+        changing_word = ','.join([sentence[pattern_index].word_str for sentence in sentences])
+        return '\n'.join([convert_to_string(sentence) for sentence in sentences]) + \
+               f"\nThe changing word was: {changing_word}\r\n"
+
+    @staticmethod
+    def collect_patterns(sentences: list[Sentence]):
+        """
+        Collects and extracts all the patterns that exist in the given sentences.
+
+        :param sentences: A list of sentences of the Sentence data type.
+        :return: A PatternCollection instance that holds:
+                 1. Each pattern and its associated sentences.
+                 2. Patterns that are defined as groups (having more than one associated sentence).
+        """
+        patterns_collection = PatternCollection()
+        for sentence in sentences:
+
+            for pattern_index in range(Pattern.START_INDEX, len(sentence)):
+                pattern = Pattern.create(sentence, pattern_index)
+                if patterns_collection.has_pattern(pattern):
+
+                    # update pattern with the additional sentence that found.
+                    patterns_collection.update_pattern(pattern, sentence)
+                    break
+
+                else:
+                    # add new pattern to the patterns collection
+                    patterns_collection.add_pattern(pattern, sentence)
+
+        return patterns_collection
 
 
 def parse_args() -> Namespace:
@@ -98,7 +155,7 @@ def parse_sentences(content: list[str]) -> list[Sentence]:
 
 
 def read_file(fp: Path) -> list[str]:
-    """" Read file. Return lines of file's content. """
+    """"Read file. Return lines of file's content."""
     try:
         with fp.open() as file:
             return file.readlines()
@@ -111,63 +168,6 @@ def write_file(fp: Path, content: Iterator[str]) -> None:
     """Write to output file."""
     with open(fp, "w") as output_file:
         output_file.writelines(content)
-
-
-def get_pattern_paragraph(sentences: list[Sentence], pattern_index: int) -> str:
-    """
-    Creates and returns a paragraph containing the pattern string details.
-
-    :param sentences: A list of sentences that share the same pattern.
-    :param pattern_index: The index of the differing word in the pattern.
-    :return: A paragraph containing the detailed pattern string.
-    """
-    changing_word = ','.join([sentence[pattern_index].word_str for sentence in sentences])
-    return '\n'.join([convert_to_string(sentence) for sentence in sentences]) + \
-           f"\nThe changing word was: {changing_word}\r\n"
-
-
-def extract_pattern_string(sentence: Sentence, pattern_index: int) -> str:
-    """Extracts the pattern string by removing the word at the specified pattern index within the given sentence."""
-    return convert_to_string(sentence[Pattern.START_INDEX:pattern_index]+sentence[pattern_index+1:])
-
-
-def extract_pattern(sentence: Sentence, pattern_index: int) -> Pattern:
-    """Extracts the pattern by specified pattern index within the given sentence."""
-    pattern_string = extract_pattern_string(sentence, pattern_index)
-    return Pattern(pattern_string, pattern_index)
-
-
-def collect_patterns(sentences: list[Sentence]) -> PatternCollection:
-    """
-    Collects and extracts all the patterns that exist in the given sentences.
-
-    :param sentences: A list of sentences of the Sentence data type.
-    :return: A PatternCollection instance that holds:
-             1. Each pattern and its associated sentences.
-             2. Patterns that are defined as groups (having more than one associated sentence).
-    """
-    patterns_collection = PatternCollection()
-    for sentence in sentences:
-
-        for pattern_index in range(Pattern.START_INDEX, len(sentence)):
-            pattern = extract_pattern(sentence, pattern_index)
-            if patterns_collection.has_pattern(pattern):
-
-                # update pattern with the additional sentence that found.
-                patterns_collection.update_pattern(pattern, sentence)
-                break
-
-            else:
-                # add new pattern to the patterns collection
-                patterns_collection.add_pattern(pattern, sentence)
-
-    return patterns_collection
-
-
-def extract_pattern_groups_output(pattern_collection: PatternCollection) -> Iterator[str]:
-    """Extract from the pattern collection only the patterns that have a group of sentences."""
-    for pattern, sentences in pattern_collection.get_patterns_groups():
-        yield get_pattern_paragraph(sentences, pattern.pattern_index)
 
 
 def main():
@@ -186,8 +186,8 @@ def main():
         return
 
     sentences = parse_sentences(lines)
-    patterns_collection = collect_patterns(sentences)
-    output = extract_pattern_groups_output(patterns_collection)
+    patterns_collection = PatternCollection.collect_patterns(sentences)
+    output = patterns_collection.extract_pattern_groups_output()
 
     # Write the program output
     write_file(output_fp, output)
