@@ -97,7 +97,7 @@ class PatternCollection:
                f"\nThe changing word was: {changing_word}\r\n"
 
     @staticmethod
-    def collect_patterns(sentences: list[Sentence]):
+    def collect_patterns(sentences: list[Sentence]) -> 'PatternCollection':
         """
         Collects and extracts all the patterns that exist in the given sentences.
 
