@@ -2,6 +2,7 @@ from typing import Final, Iterator, TypeAlias
 from collections import namedtuple
 from argparse import Namespace, ArgumentParser
 from pathlib import Path
+from typing_extensions import Self
 
 
 # CONSTANTS
@@ -9,7 +10,52 @@ OUTPUT_FILE: Final[str] = "output.txt"
 
 # TYPE ALIAS
 Word = namedtuple("Word", ["word_index", "word_str"])
-Sentence: TypeAlias = list[Word]
+
+
+class Sentence:
+
+    def __init__(self, words):
+        self.words: list[Word] = words
+
+    def __str__(self) -> str:
+        """Return the sentence as a simple string."""
+        return Sentence.get_words_string(self.words)
+
+    def __len__(self) -> int:
+        """Return the number of words the builds the sentence."""
+        return len(self.words)
+
+    @classmethod
+    def create(cls: Self, line: str) -> Self:
+        words = [Word(word_index, word_str) for word_index, word_str in enumerate(line.strip().split(" "))]
+        return cls(words)
+
+    @staticmethod
+    def get_words_string(words: list[Word]) -> str:
+        """
+        Converts list of Word type to a simple string.
+
+        :return: The sentence as a string.
+        """
+        return ' '.join([word.word_str for word in words])
+
+    @staticmethod
+    def parse_to_sentences(lines: list[str]) -> list[Self]:
+        """
+        Parses each simple string sentence into a Sentence type object.
+
+        :param lines: A list of sentences as strings.
+        :return: A list of Sentence type objects.
+        """
+        sentences = [Sentence.create(line) for line in lines]
+        return sentences
+
+    def get_word_str_by_index(self, index: int) -> str:
+        return self.words[index].word_str
+
+    def get_sub_sentence_words(self, start_index, end_index, pop_index=None) -> list[Word]:
+        pop_index = start_index if pop_index is None else pop_index
+        return self.words[start_index:pop_index] + self.words[pop_index + 1: end_index]
 
 
 class Pattern:
@@ -39,7 +85,7 @@ class Pattern:
         return hash((self.pattern_string, self.pattern_index))
 
     @classmethod
-    def create(cls, sentence: Sentence, pattern_index: int) -> 'Pattern':
+    def create(cls: Self, sentence: Sentence, pattern_index: int) -> Self:
         """return pattern instance by specified pattern index within the given sentence."""
         pattern_string = Pattern.extract_pattern_string(sentence, pattern_index)
         self = cls(pattern_string, pattern_index)
@@ -48,7 +94,10 @@ class Pattern:
     @staticmethod
     def extract_pattern_string(sentence: Sentence, pattern_index: int) -> str:
         """Extracts the pattern string by removing the word at the specified pattern index within the given sentence."""
-        return convert_to_string(sentence[Pattern.START_INDEX:pattern_index]+sentence[pattern_index+1:])
+        pattern_words: list[Word] = sentence.get_sub_sentence_words(start_index=Pattern.START_INDEX,
+                                                                    end_index=len(sentence),
+                                                                    pop_index=pattern_index)
+        return Sentence.get_words_string(pattern_words)
 
 
 class PatternCollection:
@@ -61,11 +110,11 @@ class PatternCollection:
         self._data: dict[Pattern, list[Sentence]] = dict()
         self._pattern_groups: set[Pattern] = set()
 
-    def has_pattern(self, pattern):
+    def has_pattern(self, pattern) -> bool:
         """Check if a pattern is already found."""
         return pattern in self._data
 
-    def add_pattern(self, new_pattern: Pattern, pattern_sentence: Sentence):
+    def add_pattern(self, new_pattern: Pattern, pattern_sentence: Sentence) -> None:
         """Add new pattern and initialize its associate sentence."""
         self._data[new_pattern] = [pattern_sentence]
 
@@ -92,12 +141,12 @@ class PatternCollection:
         :param pattern_index: The index of the differing word in the pattern.
         :return: A paragraph containing the detailed pattern string.
         """
-        changing_word = ','.join([sentence[pattern_index].word_str for sentence in sentences])
-        return '\n'.join([convert_to_string(sentence) for sentence in sentences]) + \
+        changing_word = ','.join([sentence.get_word_str_by_index(pattern_index) for sentence in sentences])
+        return '\n'.join([str(sentence) for sentence in sentences]) + \
                f"\nThe changing word was: {changing_word}\r\n"
 
     @staticmethod
-    def collect_patterns(sentences: list[Sentence]) -> 'PatternCollection':
+    def collect_patterns(sentences: list[Sentence]) -> Self:
         """
         Collects and extracts all the patterns that exist in the given sentences.
 
@@ -132,28 +181,6 @@ def parse_args() -> Namespace:
     return args
 
 
-def convert_to_string(sentence: Sentence) -> str:
-    """
-    Converts a Sentence type to a simple string.
-
-    :param sentence: A Sentence object.
-    :return: The sentence as a string.
-    """
-    return ' '.join([word.word_str for word in sentence])
-
-
-def parse_sentences(content: list[str]) -> list[Sentence]:
-    """
-    Parses each simple string sentence into a Sentence type object.
-
-    :param content: A list of sentences as strings.
-    :return: A list of Sentence type objects.
-    """
-    sentences = [[Word(word_index, word_str) for word_index, word_str in enumerate(line.strip().split(" "))] for
-                 line in content]
-    return sentences
-
-
 def read_file(fp: Path) -> list[str]:
     """"Read file. Return lines of file's content."""
     try:
@@ -185,9 +212,9 @@ def main():
         print(f"Error: {e}")
         return
 
-    sentences = parse_sentences(lines)
-    patterns_collection = PatternCollection.collect_patterns(sentences)
-    output = patterns_collection.extract_pattern_groups_output()
+    sentences: list[Sentence] = Sentence.parse_to_sentences(lines)
+    patterns_collection: PatternCollection = PatternCollection.collect_patterns(sentences)
+    output: Iterator[str] = patterns_collection.extract_pattern_groups_output()
 
     # Write the program output
     write_file(output_fp, output)
